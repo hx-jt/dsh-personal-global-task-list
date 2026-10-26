@@ -1,0 +1,245 @@
+# @hx-jt/dsh-personal-global-task-list
+
+## 来源与维护 / Attribution
+
+本项目基于 [sgzxs/dsh-global-task-list](https://github.com/sgzxs/dsh-global-task-list) 修改，由 [hx-jt](https://github.com/hx-jt) 维护。原项目提供了持久任务库、交互面板、子 Agent job 同步和生成式 UI 等基础能力。本维护版本在其基础上增加任务历史、持久工作笔记指导及任务上下文增量注入；纯工具续步的自动同步仍有限制，详情见下文。
+
+This project is derived from [sgzxs/dsh-global-task-list](https://github.com/sgzxs/dsh-global-task-list) and maintained by hx-jt. Upstream copyright and the full MIT license are retained in [LICENSE](LICENSE); hx-jt is additionally credited for modifications. This is an independently maintained derivative.
+
+源码仓库：[hx-jt/dsh-personal-global-task-list](https://github.com/hx-jt/dsh-personal-global-task-list)。npm 包名：`@hx-jt/dsh-personal-global-task-list`。
+
+**安装说明：GitHub 安装请选择仓库中已发布的 tag；npm 安装仅在对应包版本发布到 npm 后可用。本版本先通过 GitHub Release 提供，尚未发布到 npm。** 原版与本派生版使用相同任务工具和存储域；安装本版本时应只启用一个版本，避免重复注册。
+
+
+A global task library for the DeepSeek Harness: six model-facing tools, a persistent browser panel, subagent job status synchronization, and a generative-UI surface renderer. Tasks persist across sessions in a `storageDomain` unit and survive restarts.
+
+> 全局任务列表插件：为 DeepSeek Harness 提供一个跨会话持久化的任务库，附右下角常驻面板（轨迹等非对话界面自动隐藏）。主 agent 用 `task_add` 创建任务（带描述与进度），spawn 子 agent 后关联 `jobId` 自动同步终态；面板支持手动改状态、删除、拆分，并实时（SSE）刷新。任务可携带 `surface` 结构化文档渲染生成式 UI（进度条、时间线、表格、DAG 等）。
+
+## Persistent notebook + task history — 0.4.0-demo.2
+
+The plugin’s system section, task tool descriptions and bundled skill now describe the panel as the Personal Agent’s persistent working notebook: locate/read before resuming, update confirmed changes during work, leave results/open items at handoff, and await successful writes before claiming a save. Genuine ambiguity about target or intended change requires a focused user question before associating/updating/deleting; uniquely identified matters do not require repeated confirmation. This is model guidance, not a programmatic guarantee of compliance or unlimited recall.
+
+Task records gain a default-empty `history` field. Initial creation and actual field changes store before/after values, time and source (`agent`, `panel`, `job`) in the **same atomic record write** as current state. Agent source metadata includes session ID and the latest human-message event sequence when available; this is an address, not verification of approval. `task_update(..., changeNote?)` optionally explains the change. Repeated same-value writes add no revision. Existing records do not gain invented pre-upgrade history.
+
+- `task_history({id, offset?, limit?})` reads revisions oldest first (default20, max100), returning `{id,total,entries,nextOffset}`. Keep the same task ID when paging.
+- `task_get` reports the history count; current-state context does not expand old values. The task API also supplies history for a collapsed history section within task details, displaying newest first with source and before/after values. The description remains the current effective value.
+- History values are whole changed fields (a description budget change records the old/new descriptions); no semantic field extraction is claimed.
+- Permanent task deletion deletes its embedded history too. Use state maintenance rather than deletion when continuity is needed; no archive/trash or Git introduced.
+
+`node test/history-runtime.mjs` verifies500→300→400, source session/event/note, same-value no-op, concurrent disjoint patches, invalid-write atomicity, panel/job changes, legacy no-history records and JSON storage restart using temporary data. Static policy checks and runtime storage checks do not replace live-model behavior acceptance. Reload the actual DSH backend/plugin and refresh the browser to load the new build; a browser refresh alone is insufficient.
+
+## Task-only plugin — 0.4.0-demo.4
+
+This local derivative keeps a persistent Personal Agent task notebook: unfinished tasks, parent/child expansion, automatic task field history, and incremental task context.
+
+**As of 0.4.0-demo.3, the built-in did ledger is removed.** The plugin no longer records conversation turns, registers `did_list`/`did_get`/`did_note`, or contributes `task-ui:did`. Conversation logging belongs to an independent plugin such as **what we did**, when separately installed. This package does not assume that plugin or ReMe is available.
+
+- Independent `task-ui-state` messages provide an unfinished-task baseline, then changed tasks/fields only. No change adds no task message; completion/deletion are explicit. Descriptions/large fields have 160-character previews; verify full details with `task_get`.
+- Admission is restricted to an already nonempty accepted input batch. The next user round refreshes automatically. Pure tool continuations have **no automatic synchronization guarantee (TCI-15 restricted)**; use `task_get`. No polling, wakeup or extra model request is introduced.
+- Task data no longer contributes `task-ui:snapshot` to aggregate runtime context, so unrelated providers cannot carry it along on their updates. Old aggregate history remains intact.
+- `openingSnapshot: false` disables baseline/delta injection; `unfinishedOnly: false` selects scope `all` while retaining deltas; `promptSection` controls fixed notebook instructions. Subagents receive no global task context.
+- Each retained source message stores cumulative field fingerprints and epoch coverage metadata. Effective session history is the delivery authority; the independent `task_ui_context` domain stores pending batches for stable deliveryId retries. Metadata never emits task business changes. Reload recovers from retained history. Loss of **any** epoch delivery (including a later deletion) triggers a new epoch baseline.
+- A batch has a 16,000-character data-line budget and explicit omitted count. Undelivered rows remain pending for later eligible inputs. A partial epoch baseline makes omitted task state unknown. Full task/history data remains unchanged. Context text and session metadata accumulate; this is **not a hard total context/storage bound**.
+- Read errors preserve delivered state and log UNAVAILABLE; no empty baseline or false deletions are generated. The next eligible input retries. A model/network failure does not resend data already retained in effective history.
+
+- Existing `didLog`/`didWindowHours` settings are obsolete and cannot enable a ledger. Remove them from manually customized profiles when convenient; the bundle no longer supplies them.
+
+### Legacy did data and independent-plugin migration
+
+The old `task_ui_did` v1 domain (`records` table) is left **unchanged and unopened by this release**. Upgrading does not delete, import, rewrite or archive it. The independent plugin must perform its own backup and idempotent import; a task-plugin upgrade is not proof that migration succeeded.
+
+Reload the updated task plugin before enabling an independent plugin using the same did tool names. A still-running old module retains its listeners/tools until reload or restart. New task-plugin activation will not register or claim these names. Older context messages already in an existing conversation are not retroactively removed.
+
+Unmodified bundled task-ui skill copies update on activation, including the unstamped 0.4.0-demo.2 body. User-edited copies remain intact; review `SKILL.md.new` and remove obsolete ledger instructions yourself if the plugin reports that sidecar.
+
+Verification: `test/task-only-runtime.mjs` uses real Cordis + SessionStore + storage-domain + temporary JSON storage. It checks retired tool ownership even with old enable flags, legacy data preservation, independent contexts/tools, task history/parent links and restart persistence. `test/history-runtime.mjs` exercises task field history and panel/job changes. These checks use no LLM and never restart the live DSH.
+
+This workspace has dependencies but lacks `node_modules/.bin`; equivalent local commands are `node node_modules/tsdown/dist/run.mjs -c tsdown.host.config.mjs`, `node node_modules/tsdown/dist/run.mjs`, and `node node_modules/typescript/bin/tsc --noEmit`. Runtime integration requires the sibling Harness checkout's built `packages/storage/storage-json/lib/index.js`, or `DSH_STORAGE_JSON_MODULE` set to its absolute module path.
+
+## What it does
+
+- **Global task library** — `task_add` / `task_list` / `task_get` / `task_update` / `task_delete` model tools over a cross-session `storageDomain` unit (`task_ui`). Tasks carry a title, status (`pending` / `running` / `done` / `blocked` / `failed`), description, `nextStep`, an ordered `steps` flow, `parentId`, `dependsOn`, an optional `progress` (`{ text, percent? }`), and an optional `surface` document.
+- **Persistent panel** — a bottom-right floating panel (mounted in the session-scoped `conversation.input.dock` slot) subscribes to a Server-Sent Events channel (`/task-ui/events`) and refreshes on every task change, letting the user change status, delete (with confirmation), and trigger a generative split loop. Clicking a card expands a **secondary card** under it with the description, the step flow, dependencies, and timestamps. Styled with `--dsw-*` theme tokens and localized zh/en. It disappears on non-conversation views (e.g. trajectory).
+- **Step flow** — the detail card describes progress as a vertical flow rather than a bar: finished and pending steps share the plain frame, while the two that matter are drawn differently — `current` in a solid brand frame with a faint tint, `next` in a dashed one. Steps come from the owner's `steps` (`done` / `current` / `next` / `todo`); when it wrote none the panel derives a node from `progress`, and a list naming no `next` inherits `nextStep` as one. A step's state is drawn, so it is also announced to screen readers as text.
+- **Panel motion** — a new task rises in while the bottom-anchored panel slides up by the height it gained, which is what lifts the cards above it; a deleted card holds its slot through its exit animation and the panel retracts afterwards. Expansion is CSS-only (`grid-template-rows: 0fr → 1fr`). All of it is skipped under `prefers-reduced-motion`. A removed card is re-adopted as a ghost row inside a *layout* effect, so it never leaves the DOM for a painted frame — that gap was what made the whole list flash and the panel run a shrink/grow/shrink cycle on delete.
+- **Resizable** — drag the panel's left edge (or focus it and use ←/→) to set its width between 260px and 760px; the width is remembered in `localStorage`. The gesture follows ui-layout's own `DragHandle`: pointer capture for the whole drag, one throttled update per animation frame, and the width computed from the drag origin rather than accumulated per move.
+- **Subagent job sync** — a task linked to a background job via `task_update(id, { jobId })` auto-advances its terminal status through the `JOB_STATUS_MAP` (`completed`→`done`, `failed`→`failed`, `killed`→`blocked`). Tasks are created explicitly by the master agent, never auto-registered from arbitrary background jobs.
+- **Generative UI surface** — a task's `surface` field renders a whitelisted, recursive component tree: `section`, `metric`, `statusBadge`, `progress`, `table`, `list`, `timeline`, `dag`, `disclosure`.
+
+## Install
+
+Installing from **npm** is the recommended path — the package ships prebuilt `lib/`, so no build step runs at install time. The GitHub alternative pulls source and builds on install (see below).
+
+```sh
+# npm (recommended, prebuilt — no build step at install)
+dsh plugin --profile web add @hx-jt/dsh-personal-global-task-list
+
+# GitHub (alternative: source + prepare build)
+dsh plugin --profile web add github:hx-jt/dsh-personal-global-task-list#v0.4.0-demo.4
+```
+
+The package declares `dsh.bundle`, so `dsh` adds it to the profile's `bundles` automatically. Requires a DSH installation with `@deepseek-ai/dsh-base` and the client surface (`dsh-web-app`) present.
+
+Use at least `0.2.0` for a `0.2.x` DSH runtime (the desktop app is `0.2.0-rc.2`): earlier releases declare `0.1.x`-only DSH peer ranges, and the runtime rejects them before pnpm runs, with `installation rejected: Plugin @hx-jt/dsh-personal-global-task-list@0.1.5 is incompatible with dsh 0.2.0-rc.2`. The desktop app additionally manages its profile itself — see [Installing on the desktop app](#installing-on-the-desktop-app).
+
+### Which version did I actually get?
+
+Not necessarily the one that was displayed. A marketplace shows the version a registry reports, while the install is a package-manager run that can resolve differently — an exact pin in the profile's `package.json`, a `pnpm-lock.yaml` entry, or a registry asked in turn (DSH's plugin manager falls back to `registry.npmmirror.com` when the first one is unreachable or answers that it has no such version, and a mirror lags npm). **Nothing reconciles the two**, so "the marketplace said 2.10 but I got 2.3" is a resolution result, not a stale download.
+
+Two ways to see the truth:
+
+- ask the agent to run `taskui_probe` — it answers `[task-ui] v<version> host alive, tasks=N`; the host log line `[task-ui] host plugin loaded v<version>` says the same at startup;
+- read the profile: `<dshHome>/profiles/<profile>/node_modules/@hx-jt/dsh-personal-global-task-list/package.json`.
+
+To make an update actually land, name the version explicitly — an exact version also lets the manager's registry plan move past a mirror that does not have it yet:
+
+```sh
+dsh plugin --profile web add @hx-jt/dsh-personal-global-task-list@0.4.0-demo.4
+```
+
+And to keep receiving updates, depend on a **range** rather than an exact version: a profile pinned to `0.2.2` will keep installing `0.2.2` no matter what the marketplace shows.
+
+### GitHub install: allowBuilds
+
+Installing from GitHub pulls source, so pnpm must run the package's `prepare` script to build `lib/`. pnpm blocks that by default for git-hosted packages, and its `allowBuilds` key matches the **exact commit** (a package-name-only entry does not match — see [pnpm#12367](https://github.com/pnpm/pnpm/issues/12367)). The first `add` therefore fails with an `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` message that prints the exact key to allow. Copy that exact key into the profile's `pnpm-workspace.yaml`, then re-run:
+
+```yaml
+allowBuilds:
+  "@hx-jt/dsh-personal-global-task-list@git+https://github.com/hx-jt/dsh-personal-global-task-list.git#<commit>": true
+```
+
+Pin a tag (e.g. `#v0.4.0-demo.4`) in the install command so the commit hash — and therefore the `allowBuilds` key — stays stable.
+
+## Requirements
+
+- DeepSeek Harness (`@deepseek-ai/dsh`) at `0.1.2-alpha.2` or later: the client bundle imports `defineStore` from `@deepseek-ai/dsh-client-store`, a browser module-table entry that does not exist on earlier hosts (there the panel fails to load with `Failed to load plugins`). Verified against `0.1.5-rc.2` (CLI/web profiles) and `0.2.0-rc.2` (the DeepSeek Harness desktop app).
+- The Host half resolves `@deepseek-ai/dsh-tools`, `@deepseek-ai/dsh-llm`, `@deepseek-ai/dsh-storage-domain`, and `zod` from the profile's node_modules.
+- The client bundle is prebuilt (`lib/client.js`) and ships with the package; no build step runs at install time.
+
+## DSH version compatibility
+
+The Host half is written against two DSH generations because the `jobs` service changed shape in 0.2:
+
+| Surface | 0.1.x | 0.2.x | This plugin |
+|---|---|---|---|
+| Job change feed | `ctx.jobs.onJobsChanged(listener)` (listener receives the owner Agent) | `ctx.jobs.events.subscribe({ owners: 'all' }, listener)` (each commit carries the job snapshot) | feature-detects `jobs.events.subscribe` first, falls back to `onJobsChanged`, and disables the bridge with a log line if neither exists |
+| `ctx.jobs.list(caller)` | `caller` is the owner **Agent** | `caller` is the owner's **session id** | only used on the 0.1.x path, which is the path that needs it |
+
+Everything else the plugin touches is unchanged between the two: `defineTool` / `tools.register`, `createUserMessage`, `defineDomain` / `domainTable` / `storageDomain.open`, `webServer.register({ kind, path, handler })`, `agents.list()` / `agent.followup` / `session.header.origin`, and the `domain/changed` event. The client half needs no version split at all — the browser platform module table (`react`, `react/jsx-runtime`, `react-dom`, `react-dom/client`, `@deepseek-ai/cordis`, `dsh-client-store`, `dsh-client-ui-slots`, `dsh-client-ui-primitives`, `dsh-client-ui-dockkit`) and the `conversation.input.dock` slot contract are identical in both.
+
+`peerDependencies` therefore admit both lines (`^0.1.5-rc.2 || ^0.2.0-rc.2`). DSH enforces every `@deepseek-ai/dsh*` peer range against the running runtime at install time and again at profile composition, so a range that excludes the running version blocks the plugin instead of degrading.
+
+### Installing on the desktop app
+
+The desktop app owns its profile: `dsh --profile desktop` is refused outside the Electron application, and `dsh plugin --profile desktop <args>` expects the app to be fully quit first. Either install through the app's own Plugins page, or place the package and declare it by hand:
+
+```jsonc
+// $DSH_HOME/profiles/desktop/package.json
+{
+  "dependencies": { "@hx-jt/dsh-personal-global-task-list": "link:../../plugins/dsh-personal-global-task-list" },
+  "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@hx-jt/dsh-personal-global-task-list"] } }
+}
+```
+
+Profiles reload their configuration by default (`dsh-hmr`), so a running desktop app mounts the plugin on its next recompose — no restart required.
+
+## Build (development)
+
+```sh
+npm install
+npm run build:host    # tsdown bundles src/index.ts → lib/index.js
+npm run build:client  # tsdown bundles src/client → lib/client.js
+npm run typecheck     # tsc --noEmit, against the real DSH 0.2.0-rc.2 types
+npm test              # builds, then typecheck + smoke + render + CSS-classes
+npm run sync web      # copy the build into a profile's node_modules (dev helper)
+```
+
+Both halves are TypeScript: the Host half (`src/index.ts`) compiles to plain ESM, and the client half (TSX) compiles with CSS Modules (lightningcss) into a `__ModuleLoader__` closure-factory bundle.
+
+### Why the test suite exists
+
+The build only transpiles — tsdown runs with `dts: false` and never type-checks — so nothing in the build path catches a wrong identifier. `npm test` closes that with six layers, each of which caught something the others missed:
+
+| Layer | Catches |
+|---|---|
+| `tsc --noEmit` | undefined identifiers, wrong argument types, stale locale keys (the dictionaries are the key-set source of truth) |
+| `test/host-smoke.mjs` | what the Host half actually contributes: the six tools, their converted JSON Schema (including the object-typed `steps` items), both HTTP routes, the job-bridge subscription, and the system-prompt section. It also drives the storage lifecycle: a transient `already-open` is retried, and disposing the plugin closes the handle it owns. |
+| `test/client-smoke.mjs` | module-eval and `apply()` throws — what a browser reports as "Failed to load plugins" |
+| `test/render-check.mjs` | render-path throws across every task state. DSH isolates each slot entry, so a component that throws renders *nothing*: the panel disappears while the rest of the UI stays healthy. The harness runs the real component through a minimal hook runtime and renders child components too. |
+| `test/class-check.mjs` | a `css.foo` with no `.foo` rule (and the reverse) — the class map is a plain object, so neither side is typed |
+| `test/bundle-css-check.mjs` | the same split in the *built* artifact: every class in the bundle's exported map must have a rule in the CSS text that bundle injects. Source and build can disagree. |
+
+The typecheck needs the DSH packages as `devDependencies`; they are pinned exactly to the runtime line the plugin targets, and they never ship (`files` lists only `lib/` and the patch).
+
+## Model Experience
+
+### Request context and condition
+
+The package contributes six model-facing tools to the agent's tool catalog.
+
+#### What the model sees
+
+- `taskui_probe` — reports the plugin's host-alive status and current task count.
+- `task_list` — one triage line per task: `- [status] title (id[, job=...]) — next: ...`.
+- `task_get(id)` — the full record of one task, ordered the way a session picking up someone else's work needs it: status and title, `progress` (with percent), `next`, the whole `steps` flow with its states, dependencies, parent, job, description, and timestamps.
+- `task_add(title, description?, nextStep?, steps?, parentId?, dependsOn?, surface?, progress?)` — creates a task (initial `pending`).
+- `task_update(id, title?/status?/description?/nextStep?/steps?/parentId?/dependsOn?/surface?/progress?/jobId?)` — patches one task; `progress` is `{ text, percent? }`, `nextStep` is the one-line "what happens next", `steps` is the ordered `[{ text, state }]` flow the detail card draws, `surface` accepts a structured generative-UI document, and `jobId` links the task to a background job for terminal-status sync.
+- `task_delete(id)` — deletes one task.
+
+The list is deliberately short and the detail lives in `task_get`, so the model's read path is "filter with `task_list`, then read the one task you are about to work on". The durable record carries far more than any single line could, and a later session has no other way to reach it.
+
+`nextStep` and `steps` postdate the original record schema. Both are optional and defaulted, and the domain's backend descriptor is derived from the domain name, version, and table names rather than the zod schemas — so adding a column needs no version bump, and records written before it existed still load. `steps` items are validated by the durable zod boundary on write, so the tool parameter declares them as loose objects (`additionalProperties: true`) instead of duplicating that enum in JSON Schema.
+
+The `surface` document is a recursive, whitelisted component tree (`section` / `metric` / `statusBadge` / `progress` / `table` / `list` / `timeline` / `dag` / `disclosure`) rendered by the browser panel. Unknown kinds are ignored by the renderer; the Host stores the document as opaque JSON.
+
+#### How the agent is made to use it
+
+A skill is **model-invoked**: the catalog the model sees carries only each skill's name and description, so `task-ui` loads exactly when the model decides that description matches — which is not when ordinary work starts. That is the wrong lever for behaviour that must happen unprompted, so the plugin uses the levers that are always present instead:
+
+1. **Tool descriptions** — the schemas sit in the system prompt's tool catalog on every request. Each one states its purpose, the moment to act, and its boundary (the same shape the harness uses for its own `todo_write`, which is proactive for exactly this reason). `task_add` says to record multi-step work *before starting it and always before delegating* — and to record it late rather than not at all; `task_update` says to keep the entry moving, to link a delegated job, and how to finish one properly (clear `nextStep`, leave `steps` all `done`, write the outcome into `description`).
+
+   The skip boundary is deliberately a **shape** test, not a length test. It first read "skip trivial single-step requests / one-shot answers", and a repo analysis walked straight through it: "analyze X" is one exchange with one deliverable, so a model could reasonably file it under "one-shot". It now names the shapes that count — analyze / investigate / compare / implement / review, and anything the user calls a task — and keeps exactly one exemption: a reply you can give without looking anything up.
+2. **One system-prompt section** (`task-ui:library`, at the subagent tool's own order) — one sentence in the harness's own register, so a model that never reaches for a tool still knows the library exists. It covers the whole obligation, not just the write half: record before starting, keep current while working, **read the record back before continuing what an earlier session started**, name the shapes that count as multi-step, and record late rather than not at all. It renders **two variants**: the session that owns the work gets all of it, while a subagent (read from `AssembleContext.agent.session.header.origin`) is told only to keep *its* task's record true — it does not plan, delegate, or create parallel entries its spawner cannot see. It renders empty in any scope where `task_add` is not callable, and `config.promptSection: false` drops it for a deployment that prefers to rely on the descriptions alone.
+3. **Just-in-time notes in tool results** — the write tools report a *derived* inconsistency in their own result, and say nothing otherwise. `task_add` names the fields a title-only entry is missing; `task_update` on a task that just became `done` names the specific gaps (a `nextStep` still set, steps not marked `done`, an empty `description`). These restate no rule and repeat no guidance — they read the record they just wrote and report what is wrong with *this* one — so they cost nothing until something is actually wrong, and they land at the moment it can still be fixed. A tool result is appended to the conversation, so unlike a section it never touches the cached prompt prefix.
+
+4. **The operator manual rides the first library call of a session** — the bundled skill's body is attached to the result of the first `task_*` call, once per session, so a model that never calls the `skill` tool still reads the manual at the moment it decides to use the library. Delivering it in a tool result matters for three reasons: it lands in the **same turn** (a section or context could only take effect on the next request), it costs nothing in sessions that never touch the library, and it is appended to the conversation rather than injected into the prompt, so the cached prefix is untouched. The body is read from this package's own bundled copy rather than through `ctx.skills`, because a host-plane plugin cannot rely on seeing a provider that an agent preset mounted in its own scope; front matter is stripped, and the text stays under the tool-result pruner's threshold.
+5. **An orchestration hook delivers it earlier** — a `tools/post-execute` listener watches for the calls that reveal the model is organising multi-step work: `todo_write` (it decided to track steps), any `subagent*` spawn (it is delegating), `workflow` / `ralph`. The first one in a session attaches the manual to that call through `additionalContexts` — the harness's own channel for "attach context for the next request" — so the called tool's result is left exactly as its owner wrote it. This is the difference between explaining the library *after* the model already recorded something and explaining it as the model starts arranging the work. The message is attributed with this plugin's own `MessageSourceMap` kind and declares `form: 'instructions'` (the semantic vocabulary's term for instructions read out of a file), per the harness's rule that each producer declares its own kind rather than sharing a catch-all.
+
+   Both delivery channels go through one once-per-session set, so exactly one of them wins and the manual is never sent twice.
+
+Sections are merged **by name**, so this one — a unique name no DSH package or preset uses — is never shadowed by, and never shadows, the deployment's persona: all of them simply render in `order` sequence (`deployment:persona-prefix` at 0, this at the subagent tool's order, `deployment:persona-suffix` at 10200).
+
+The bundled skill remains the place for the *detailed* workflow (the subagent supervision loop, the flow-authoring rules, the cross-session handoff read order, the `surface` component catalog). It is **not** injected into the prompt — a model needs to decide to use the library before that detail is worth its tokens, and the always-on levers are what make it decide — but levers 4 and 5 put the body in front of it once the session is actually arranging work, which is the gap between "decided to use it" and "knows how to use it well".
+
+#### Token effect
+
+Six tool schemas plus their descriptions are injected into the system-prompt tool catalog, and — unless `config.promptSection` is false — one fixed sentence into the system prompt. Fixed cost; no per-task or data-dependent prompt growth.
+
+#### KV Cache effect
+
+Independent of the agent's request-context assembly. The tool schemas and the prompt section are static, so the prompt prefix is stable across requests; task-list content does not enter the prompt. A plugin version change (or toggling `promptSection`) replaces the section, or the tool schemas, and invalidates reuse.
+
+## Design notes
+
+**Tasks are session-independent by design.** The record deliberately does not name the session that created it or last touched it, and no field ties an entry to a conversation. The library exists so that work hands off seamlessly: any session — a later one, a different preset, a subagent — picks an entry up and continues, and what it needs is *what is true now* and *what to do next*, both of which the record carries (`progress`, `steps`, `nextStep`). Recording an origin would make every entry an artifact of the conversation that produced it, which is the opposite of the point; it would also invite a later session to defer to an owner that no longer exists. This is why `task_get` leads with state rather than history, and why nothing has to be rewritten when a task outlives the session it started in.
+
+## Known Limitations and Deferred Work
+
+- **No graph layout** — the `dag` surface renders nodes as chips plus an edges list, not a positioned graph.
+- **Surface is opaque** — the Host stores `surface` as unvalidated JSON (`z.record`); malformed kinds fall back to "ignored" in the renderer rather than a load-time error.
+- **`sync-profile.mjs` is a local dev helper** — it copies the built package into `$DSH_HOME/profiles/<profile>/node_modules` (profile defaults to `web`) and warns when that profile's `dsh.profile.bundles` does not list the plugin. It is not published (excluded via `files`); use `dsh plugin add` for installation.
+- **Job-status sync degrades, never blocks** — a runtime exposing neither `jobs.events.subscribe` nor `jobs.onJobsChanged` keeps the tools, the panel, and the HTTP API, and logs `jobs service exposes no change feed; job status sync disabled`.
+- **The prompt section cannot force the behaviour** — descriptions and one sentence raise the odds that the model records its work; nothing in the harness compels it. A deployment that needs a guarantee should say so in its own persona or preset instructions, which outrank a plugin's contribution.
+- **Skill updates are seeded, and can also be shadowed** — the Host half writes `skills/task-ui/SKILL.md` into `<dshHome>/skills/task-ui/` and keeps it current, but it will not clobber a copy the user edited: an edited copy is left alone and this version's text is written beside it as `SKILL.md.new`. More importantly, the seeded copy is only one of several possible roots, and `dsh-skill-filesystem` ranks them (lowest wins): project `.dsh` 100, project `.agents` 200, `customSkillDirs` 300, `$DSH_HOME/skills` 400, user `.agents` 500, and a package's own bundled copy last at 600. A deployment whose `customSkillDirs` holds its own `task-ui` copy therefore **shadows** the seeded one — an agent preset copied from another machine can silently pin a months-old manual while the plugin's copy is current. The plugin cannot see or fix a shadowing copy; if the loaded skill looks stale, check those roots first.
+- **Blocked reasons have no field of their own** — `dependsOn` covers task-to-task blocking; a reason that is not another task ("waiting on an external service") has only `nextStep` to live in.
+- **A `running` task linked to a job is flagged, not corrected** — the job registry is in-process, so a `jobId` written before the running Host started cannot refer to anything alive. Both read paths say so: `task_list` appends `[expired]`, `task_get` leads with a `warning:` line, and the panel colours the job line with `--dsw-alias-state-warn-primary`. The record is *annotated* rather than rewritten, because the plugin cannot know whether the work finished, was abandoned, or is simply unrecorded. The signal is the task's own `updatedAt` compared against Host start (`jobs` exposes no call that enumerates every owner's jobs), so a write after boot clears the flag — a false negative if a session sets `running` by hand on a task that still carries an old `jobId`.
+
+- **The client bundle is not byte-reproducible** — `npm run build:client` emits the CSS-module class map in a different key order on every run, so the bundle hash changes even with identical sources. The key→hash pairs themselves are stable and nothing at runtime observes the order; the only casualty is comparing a local build against a published tarball by hash, which is why `lib/client.js` never matches its published copy byte for byte.
+
+## Acknowledgements
+
+Inspired by [HomeRail](https://github.com/xiaotianfotos/homerail) — its generative-UI (A2UI) idea of "the agent emits a bounded, whitelisted component tree that a host renders into a glanceable view" shaped this plugin's `surface` document and component catalog (`section` / `metric` / `statusBadge` / `progress` / `table` / `list` / `timeline` / `dag` / `disclosure`), as well as the principle of preferring built-in rendering over dumping raw logs.
+
+### Reload and rollback
+
+Rebuild host/client then reload the plugin host (browser refresh is insufficient). Existing unstamped demo.3 skill copies upgrade; edited skills receive `.new` instead of being overwritten. Disable `openingSnapshot` to stop automatic delivery while preserving tools/data. `task_ui_context` contains only pending control metadata; do not clear task_ui or legacy did domains. If pending metadata is removed while the plugin is stopped, retained source messages still recover delivered state; if history coverage is unavailable the next input creates a recovery baseline. Old aggregate snapshots are not removed.

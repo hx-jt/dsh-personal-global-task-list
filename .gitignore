@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# Build artifacts (all of lib/ is now generated: client via tsdown.config.mjs,
+# host via tsdown.host.config.mjs; both rebuilt by `prepare`).
+lib/
+*.tgz
+
+# Lockfile (dev-only; consumers resolve via peerDependencies against DSH)
+package-lock.json
