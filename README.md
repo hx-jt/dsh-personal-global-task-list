@@ -1,6 +1,6 @@
 # 全局任务工作笔记
 
-面向 DeepSeek Harness 的持久任务插件，包名为 `@hx-jt/dsh-personal-global-task-list`，当前版本为 `0.4.0-demo.4`。插件提供跨会话任务库、交互面板、任务字段历史、关联后台任务的状态同步，以及任务上下文的基线和增量注入。
+面向 DeepSeek Harness 的持久任务插件，包名为 `@hx-jt/dsh-personal-global-task-list`，当前版本为 `0.4.0-demo.5`。插件提供跨会话任务库、交互面板、任务字段历史、关联后台任务的状态同步，以及任务上下文的基线和增量注入。
 
 ## 来源与许可证
 
@@ -12,23 +12,42 @@
 
 ## 发布与安装
 
+### 直接使用仓库链接安装
+
+在 DSH「插件 → 添加插件 → 包名或地址」中直接粘贴：
+
+```text
+https://github.com/hx-jt/dsh-personal-global-task-list
+```
+
+从 `0.4.0-demo.5` 起，仓库直接保存预构建的 `lib/index.js`、`lib/client.js` 及构建清单；没有 `prepare`、安装前后构建或打包生命周期。消费者不需要本地编译，不需要添加 `allowBuilds`、设置 `--ignore-scripts` 或放宽宿主的构建审批策略。运行依赖仍由宿主安装器正常解析。
+
+如需固定版本，可使用仓库地址加无前缀标签：
+
+```text
+https://github.com/hx-jt/dsh-personal-global-task-list#0.4.0-demo.5
+```
+
+### 使用预构建发布包安装
+
+
 三方插件统一以**预构建的 `.tgz` 包**交付：构建完成后使用 `npm pack` 生成，每个版本一个，上传到 [GitHub Releases](https://github.com/hx-jt/dsh-personal-global-task-list/releases)。安装包包含宿主和客户端构建产物、加载配置、内置技能、README、变更记录与许可证；安装时不需要现场编译插件源码。
 
-版本号严格遵循 SemVer，包版本、发布标签和发布标题均不带 `v` 前缀。本版为 `0.4.0-demo.4`，其中 `demo.4` 是合法的预发布标识；不将预发布版本表述为正式稳定版本。后续每个版本使用自己的标签与安装包。
+版本号严格遵循 SemVer，包版本、发布标签和发布标题均不带 `v` 前缀。本版为 `0.4.0-demo.5`，其中 `demo.5` 是合法的预发布标识；不将预发布版本表述为正式稳定版本。后续每个版本使用自己的标签与安装包。
 
 在 DSH 的「插件 → 添加插件 → 包名或地址」中粘贴以下**安装包直链**：
 
 ```text
-https://github.com/hx-jt/dsh-personal-global-task-list/releases/download/0.4.0-demo.4/hx-jt-dsh-personal-global-task-list-0.4.0-demo.4.tgz
+https://github.com/hx-jt/dsh-personal-global-task-list/releases/download/0.4.0-demo.5/hx-jt-dsh-personal-global-task-list-0.4.0-demo.5.tgz
 ```
 
 也可以在需要安装插件的环境中使用命令：
 
 ```sh
-dsh plugin --profile web add 'https://github.com/hx-jt/dsh-personal-global-task-list/releases/download/0.4.0-demo.4/hx-jt-dsh-personal-global-task-list-0.4.0-demo.4.tgz'
+dsh plugin --profile web add 'https://github.com/hx-jt/dsh-personal-global-task-list/releases/download/0.4.0-demo.5/hx-jt-dsh-personal-global-task-list-0.4.0-demo.5.tgz'
 ```
 
-如果无法从宿主访问 GitHub，可下载该 `.tgz` 后，使用宿主能够读取的安装包绝对路径安装。不要将 Release 网页、自动生成的源码压缩包或源码仓库地址当作预构建安装包。
+如果无法从宿主访问 GitHub，可下载该 `.tgz` 后，使用宿主能够读取的安装包绝对路径安装。不要将 Release 网页、自动生成的源码压缩包当作预构建安装包；直接仓库安装请使用上面的独立入口。
 
 本包尚未发布到 npm；`npm pack` 在这里仅用于生成安装包。不能仅填 npm 包名安装。DSH 仍需能够解析插件所声明的运行依赖，预构建不等于依赖全部内嵌或完全离线安装。
 
@@ -110,18 +129,18 @@ dsh plugin --profile web add 'https://github.com/hx-jt/dsh-personal-global-task-
 
 ## 开发、验证与打包
 
-源码安装与开发构建仅供维护者使用，用户交付物仍为 Release 中的预构建 `.tgz`。
+源码安装与开发构建仅供维护者使用，仓库安装与 Release 安装都直接消费预构建产物。
 
 ```sh
 npm install
-npm run build:host
-npm run build:client
+npm run build
+npm run check:distribution
 npm run typecheck
 npm test
-npm pack --ignore-scripts
+npm pack
 ```
 
-`--ignore-scripts` 用于对已构建、已验证的产物打包，避免再次触发构建。`npm test` 会先构建宿主和客户端，再执行类型检查、宿主与客户端加载、任务持久化、增量差分、真实宿主捕获适配器、历史、渲染和样式检查。
+`npm pack` 本身不会触发本包构建；维护者先显式执行 `npm run build` 和检查，再执行 `npm pack`。`npm test` 会先构建宿主和客户端，再执行类型检查、宿主与客户端加载、任务持久化、增量差分、真实宿主捕获适配器、历史、渲染和样式检查。
 
 在本项目工作区中，若插件目录缺少命令入口，可使用兄弟 Harness 工作区已有的工具链：
 
@@ -140,3 +159,10 @@ PATH="$PWD/../deepseek-harness/node_modules/.bin:$PATH" npm test
 临时关闭自动注入可设置 `openingSnapshot: false`，任务工具、历史与面板仍可使用。控制域初始化失败时需修复后重载插件。停止插件后若移除 `task_ui_context` 控制元数据，仍可从有效来源消息恢复，覆盖不足则重建基线；不要清空任务域、旧会话经历域或会话数据。
 
 结构化界面文档以 JSON 保存，未知组件可能被忽略。阻塞原因没有独立字段，可保存在任务描述或下一步中。模型维护行为取决于实际模型与上层指令，插件提示不提供强制执行保证。
+
+
+### 源码与预构建产物一致性
+
+每次修改源码、构建配置或版本后，维护者显式执行 `npm run build`，然后提交源码与整个 `lib/`。构建命令同时写入 `lib/build-manifest.json`，记录源码、构建配置及宿主/客户端产物的 SHA-256；`npm run check:distribution` 校验清单、必需文件、发布文件列表与消费者生命周期限制。检查不会自动重建来掩盖未同步的产物。
+
+维护和发布前运行上述无依赖检查，不需要执行消费者安装脚本。当前仓库未配置自动持续集成。如果只修改文档或测试，仍应检查清单有效；每个新版本的 GitHub Release 继续仅交付一个 `npm pack` 生成的预构建 `.tgz`，不覆盖旧版本附件。

@@ -1,6 +1,6 @@
 {
   "name": "@hx-jt/dsh-personal-global-task-list",
-  "version": "0.4.0-demo.4",
+  "version": "0.4.0-demo.5",
   "description": "Global task library with a persistent interactive panel: task CRUD tools, linked-subagent terminal-status sync, and a generative-UI surface renderer for the DeepSeek Harness",
   "homepage": "https://github.com/hx-jt/dsh-personal-global-task-list#readme",
   "bugs": {
@@ -36,18 +36,20 @@
     "skills/task-ui/SKILL.md",
     "CHANGELOG.md",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "lib/build-manifest.json"
   ],
   "scripts": {
     "build:host": "tsdown -c tsdown.host.config.mjs",
     "build:client": "tsdown",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run build:host && npm run build:client",
-    "test": "npm run typecheck && node test/client-smoke.mjs && node test/host-smoke.mjs && node test/task-only-runtime.mjs && node test/task-context-runtime.mjs && node test/task-context-host.mjs && node test/history-runtime.mjs && node test/render-check.mjs && node test/class-check.mjs && node test/bundle-css-check.mjs",
-    "prepare": "npm run build:host && npm run build:client",
+    "pretest": "npm run build",
+    "test": "npm run check:distribution && npm run typecheck && node test/client-smoke.mjs && node test/host-smoke.mjs && node test/task-only-runtime.mjs && node test/task-context-runtime.mjs && node test/task-context-host.mjs && node test/history-runtime.mjs && node test/render-check.mjs && node test/class-check.mjs && node test/bundle-css-check.mjs",
     "sync": "node sync-profile.mjs",
     "test:runtime": "node test/task-only-runtime.mjs",
-    "test:history": "node test/history-runtime.mjs"
+    "test:history": "node test/history-runtime.mjs",
+    "build": "npm run build:host && npm run build:client && node scripts/build-manifest.mjs write",
+    "check:distribution": "node scripts/build-manifest.mjs check && node test/distribution-check.mjs"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",

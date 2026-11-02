@@ -1,3 +1,11 @@
+## 0.4.0-demo.5
+
+- 修复直接粘贴 GitHub 仓库 URL 安装时，`prepare` 导致的构建授权错误。
+- 移除消费者安装构建生命周期，仓库提交预构建宿主、客户端及构建清单；维护者显式构建。
+- 增加无依赖的源码/产物哈希、交付文件及生命周期检查，供维护和发布前显式运行。
+- 中文 README 同时提供直接仓库 URL 和 Release 预构建包安装；保留旧版 Release。
+- 任务运行逻辑与 TCI-15 的受限同步语义不变。
+
 ## 0.4.0-demo.4
 
 - Replace aggregate full snapshots with independently sourced, per-session baseline/delta messages, complete-field fingerprinting, explicit completion/deletion and bounded previews/batches.

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "package": "@hx-jt/dsh-personal-global-task-list",
+  "version": "0.4.0-demo.5",
+  "inputs": {
+    "src/client/TaskUiPanel.module.css": "dd363dfd2aa7befa65cc98bebb4a8b50e94c6516b3ed9cd1de5e83b1eb4a5672",
+    "src/client/TaskUiPanel.tsx": "7eddd13d4bc612fc761334e02510311686c0038f908d7a2e8d822dca84d9555b",
+    "src/client/contract/slots.ts": "d239ff1f657b012e4fb16332320987346332907d31c0733c758d5e73d04e516f",
+    "src/client/index.ts": "ab80ba4677d1ccbedfe4d28ee449365f78b1ced863acab1ee7ba0d206f7a69ae",
+    "src/client/locales.ts": "6d8bf8734d1edc25732f6d6d123cb7af6d14083a017005e2b5e0d518a7df3d76",
+    "src/client/store.ts": "216aa2604d2af1e669d4c959042bc9e68c153f0b4ac1a73117845da9f2dd9996",
+    "src/client/surface.tsx": "778d1c2c54813068281c01502534dcbd31b83ec5f0c73eb24585c584c3e1203f",
+    "src/css-modules.d.ts": "d4395f8ef04ea16601b9b84979df7de5af4ccfeb7b094c510f1442f3d8d5785a",
+    "src/index.ts": "f7069dd1bfb238663c962df53ae16932cf3a34d0ddeebabbdaa3f95b89c3656c",
+    "src/task-context.ts": "0b0c3d2515c89e652d1ec5310b562fc4571d24188e5001091959cedbcc7768c2",
+    "src/task-history.ts": "3a40e9a3da8c7e80eb3f36eea369c151767e3aae6bf4ee9853b39bb05116421f",
+    "tsconfig.json": "49cdd3877a362cef9febf772aaa5e5abee2ec9aeff4ddd541491685adfd0a5f0",
+    "tsdown.config.mjs": "b59085a8d254e0d438bb68c96a894a06b0dc14155eac97f4a29201366f5de4b9",
+    "tsdown.host.config.mjs": "9562afe751d7706f70cc874f99a4f473361bfba66c6cd2a525ceab895f38dff7"
+  },
+  "outputs": {
+    "lib/index.js": "9af069bb6b75641566c3422d4988bdd71ff08e04427dce158ae165f9fe37ddbd",
+    "lib/client.js": "ee693ef90779ca995194d02555b6af3e60b2603492af85e3e20c8906829686ef"
+  }
+}
